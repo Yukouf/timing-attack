@@ -35,6 +35,8 @@ Essai "a00000" → compare 'a'='s' ✗ → 1 comparaison    → ~1 µs
 
 ## Démo
 
+![Démo](https://raw.githubusercontent.com/Yukouf/timing-attack/main/screenshot.png)
+
 ```bash
 python3 timing-attack.py
 ```
