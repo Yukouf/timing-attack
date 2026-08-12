@@ -54,6 +54,29 @@ python3 timing-attack.py
 ✅ TROUVÉ: kxqtwp
 ```
 
+## La limite du canal temporel (et la sentinelle)
+
+> **Point d'honnêteté pédagogique.** Dans la comparaison "classique"
+> (`for … if requète[…] != … return False`), le **dernier caractère** est
+> ambigu : un candidat faux qui diverge au dernier octet exécute *autant* de
+> comparaisons que le bon caractère. Les temps sont identiques → impossible,
+> sans tricherie, de distinguer la bonne dernière lettre *uniquement* par le
+> timing. Beaucoup de démos trichent en ré-utilisant le secret pour trancher
+> ce dernier caractère (un oracle d'égalité caché) — cette version ne le fait
+> pas.
+
+Pour rendre la démo complète **sans ré-utiliser le secret dans l'attaque**, la
+cible simulée `check_password()` matérialise une **terminaison sentinelle** :
+un vrai serveur, quand le mot de passe est entièrement correct, effectue un
+traitement d'après-authentification (session, HMAC, requête en base…) qui coûte
+du temps. Ce coût est simulé par un délai supplémentaire à la toute fin. La
+sentinelle fait qu'un *match complet* est mesurablement plus long qu'une
+divergence au dernier octet → **la fuite du dernier caractère redevient réelle
+et reproductible**, toujours sans accès direct au secret depuis l'attaque.
+
+L'attaque ne consulte *jamais* le secret : tout ne passe que par le temps de
+réponse de la cible, sentinelle comprise.
+
 ## Pourquoi c'est important
 
 - Cette attaque fonctionne sur les **comparaisons de tokens API**, de **signatures HMAC**, de **mots de passe**
@@ -68,6 +91,15 @@ python3 timing-attack.py --demo
 
 # Attaquer un mot de passe spécifique
 python3 timing-attack.py "mon_mot_de_passe"
+```
+
+Code de retour : `0` succès (mot de passe retrouvé), `1` échec (caractère hors
+du jeu attaqué), `2` mauvaise utilisation.
+
+Variables d'environnement :
+```bash
+export TIMING_SLEEP=0.01    # délai artificiel par comparaison (défaut 0.01 s)
+export TIMING_CHARSET=abcdefghijklmnopqrstuvwxyz0123456789  # jeu attaqué
 ```
 
 ## Parade
