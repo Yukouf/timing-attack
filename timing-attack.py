@@ -47,6 +47,7 @@ import sys
 import time
 import string
 import secrets
+import statistics
 
 # ── Paramètres (surchargeables par environnement pour les tests) ────────────
 SLEEP_PER_CHAR = float(os.environ.get("TIMING_SLEEP", "0.01"))
@@ -99,12 +100,17 @@ def matched_count(guess, secret):
 # ── L'attaque ───────────────────────────────────────────────────────────────
 
 def measure(guess, secret, rounds):
-    """Mesure le temps moyen de check_password() sur `rounds` essais."""
-    start = time.perf_counter()
+    """Mesure la médiane de `rounds` réponses individuelles.
+
+    La médiane résiste à une pause scheduler isolée, contrairement à une mesure
+    globale où un seul pic peut faire gagner un mauvais candidat.
+    """
+    samples = []
     for _ in range(rounds):
+        start = time.perf_counter()
         check_password(guess, secret)
-    elapsed = time.perf_counter() - start
-    return elapsed / rounds
+        samples.append(time.perf_counter() - start)
+    return statistics.median(samples)
 
 
 def crack_char(known_prefix, secret, rounds=3):
@@ -126,7 +132,7 @@ def crack_char(known_prefix, secret, rounds=3):
     return best_char, best_time
 
 
-def crack(secret, rounds=1):
+def crack(secret, rounds=3):
     """Devine le mot de passe complet. Retourne (mot_de_passe, succes: bool).
 
     Tous les caractères, y compris le dernier, sont déduits du TEMPS de

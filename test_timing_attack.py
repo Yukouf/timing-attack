@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 # Petite mais suffisante : rounds * TIMING_SLEEP = 5 * 0.005 = 0.025 s.
 TIMING_SLEEP = "0.005"
@@ -31,6 +32,18 @@ def _load_module():
 
 
 timing_attack = _load_module()
+
+
+class TestRobustMeasurement(unittest.TestCase):
+    def test_measure_uses_median_to_ignore_one_scheduler_spike(self):
+        """Une pause scheduler isolée ne doit pas gonfler toute la mesure."""
+        # 3 mesures individuelles : 10 ms, pic aberrant 900 ms, 12 ms.
+        perf_values = iter([0.000, 0.010, 1.000, 1.900, 2.000, 2.012])
+        with patch.object(timing_attack.time, "perf_counter",
+                          side_effect=lambda: next(perf_values)), \
+             patch.object(timing_attack, "check_password"):
+            measured = timing_attack.measure("a", "a", rounds=3)
+        self.assertAlmostEqual(measured, 0.012, places=6)
 
 
 class TestComparisonOracle(unittest.TestCase):
