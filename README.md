@@ -1,48 +1,53 @@
-# 🕐 Timing Attack — Devine un mot de passe avec un chronomètre
+# 🕐 Timing Attack: Guess a Password with a Stopwatch
 
-**Démonstration d'attaque par canal auxiliaire (side-channel attack).**
+<p align="center">
+  <a href="README.md">English</a> &bull;
+  <a href="README_fr.md">Français</a>
+</p>
 
-## L'analogie du coffre-fort
+**Demonstration of a side-channel attack.**
 
-Imagine un coffre à combinaison. Normalement, pour un code à 4 chiffres, tu dois tester jusqu'à 10 000 combinaisons.
+## The vault analogy
 
-Mais imagine que ce coffre a un défaut : chaque fois que tu tournes le **bon** chiffre, le mécanisme fait un "clic" un tout petit peu plus long. Imperceptible à l'oreille, mais mesurable avec un bon micro.
+Imagine a combination safe. Normally, for a 4-digit code, you have to try up to 10,000 combinations.
 
-Résultat : au lieu de 10 000 essais, il t'en faut **40** (10 par chiffre). Tu viens de casser le coffre avec un chronomètre.
+But imagine this safe has a flaw: every time you turn the **right** digit, the mechanism makes a "click" that is just a tiny bit longer. Imperceptible to the ear, but measurable with a good microphone.
 
-## Comment ça marche
+Result: instead of 10,000 attempts, you need only **40** (10 per digit). You have just cracked the safe with a stopwatch.
 
-Beaucoup de fonctions de comparaison de mots de passe ressemblent à ça :
+## How it works
+
+Many password comparison functions look like this:
 
 ```python
 def check_password(guess, real):
     for i in range(len(real)):
         if guess[i] != real[i]:
-            return False  # ← Sortie immédiate
+            return False  # ← Immediate return
     return True
 ```
 
-Problème : plus le nombre de caractères corrects est élevé, plus la fonction met de temps à répondre. Cette différence (quelques microsecondes) suffit à deviner le mot de passe **caractère par caractère**.
+Problem: the higher the number of correct characters, the longer the function takes to respond. That difference (a few microseconds) is enough to guess the password **character by character**.
 
 ```
-Mot de passe : "secret"
+Password: "secret"
 
-Essai "s00000" → compare 's'='s' ✓, '0'='e' ✗ → 2 comparaisons → ~2 µs
-Essai "a00000" → compare 'a'='s' ✗ → 1 comparaison    → ~1 µs
+Attempt "s00000" → compare 's'='s' ✓, '0'='e' ✗ → 2 comparisons → ~2 µs
+Attempt "a00000" → compare 'a'='s' ✗ → 1 comparison    → ~1 µs
                                          ↑
-                              "s" est plus long → c'est le bon !
+                              "s" is longer → that is the right one!
 ```
 
-## Démo
+## Demo
 
-![Démo](https://raw.githubusercontent.com/Yukouf/timing-attack/main/screenshot.png)
+![Demo](https://raw.githubusercontent.com/Yukouf/timing-attack/main/screenshot.png)
 
 ```bash
 python3 timing-attack.py
 ```
 
 ```
-🎯 CIBLE : kxqtwp  (longueur 6)
+🎯 TARGET: kxqtwp  (length 6)
 
   Position 1: ✅ k  [█░░░░░]  3.42 µs
   Position 2: ✅ x  [██░░░░]  3.51 µs
@@ -51,70 +56,71 @@ python3 timing-attack.py
   Position 5: ✅ w  [█████░]  3.85 µs
   Position 6: ✅ p  [██████]  3.96 µs
 
-✅ TROUVÉ: kxqtwp
+✅ FOUND: kxqtwp
 ```
 
-## La limite du canal temporel (et la sentinelle)
+## The limit of the timing channel (and the sentinel)
 
-> **Point d'honnêteté pédagogique.** Dans la comparaison "classique"
-> (`for … if requète[…] != … return False`), le **dernier caractère** est
-> ambigu : un candidat faux qui diverge au dernier octet exécute *autant* de
-> comparaisons que le bon caractère. Les temps sont identiques → impossible,
-> sans tricherie, de distinguer la bonne dernière lettre *uniquement* par le
-> timing. Beaucoup de démos trichent en ré-utilisant le secret pour trancher
-> ce dernier caractère (un oracle d'égalité caché) — cette version ne le fait
-> pas.
+> **Pedagogical honesty note.** In the "classic" comparison
+> (`for … if requète[…] != … return False`), the **last character** is
+> ambiguous: a wrong candidate that diverges at the last byte runs *as many*
+> comparisons as the right character. The times are identical → it is
+> impossible, without cheating, to distinguish the right last letter *solely*
+> through timing. Many demos cheat by reusing the secret to settle
+> that last character (a hidden equality oracle): this version does not do
+> that.
 
-Pour rendre la démo complète **sans ré-utiliser le secret dans l'attaque**, la
-cible simulée `check_password()` matérialise une **terminaison sentinelle** :
-un vrai serveur, quand le mot de passe est entièrement correct, effectue un
-traitement d'après-authentification (session, HMAC, requête en base…) qui coûte
-du temps. Ce coût est simulé par un délai supplémentaire à la toute fin. La
-sentinelle fait qu'un *match complet* est mesurablement plus long qu'une
-divergence au dernier octet → **la fuite du dernier caractère redevient réelle
-et reproductible**, toujours sans accès direct au secret depuis l'attaque.
+To make the demo complete **without reusing the secret in the attack**, the
+simulated target `check_password()` materializes a **sentinel termination**:
+a real server, when the password is entirely correct, performs
+post-authentication processing (session, HMAC, database query…) that costs
+time. That cost is simulated by an additional delay at the very end. The
+sentinel means that a *complete match* is measurably longer than a
+divergence at the last byte → **the leak of the last character becomes real
+again and reproducible**, still without direct access to the secret from the
+attack.
 
-L'attaque ne consulte *jamais* le secret : tout ne passe que par le temps de
-réponse de la cible, sentinelle comprise.
+The attack *never* consults the secret: everything goes only through the
+response time of the target, sentinel included.
 
-## Pourquoi c'est important
+## Why it matters
 
-- Cette attaque fonctionne sur les **comparaisons de tokens API**, de **signatures HMAC**, de **mots de passe**
-- La parade standard : `hmac.compare_digest()` — comparaison en **temps constant**
-- En 2026, ça reste une des vulnérabilités les plus sous-estimées
+- This attack works on **API token comparisons**, **HMAC signatures**, **passwords**
+- The standard countermeasure: `hmac.compare_digest()`, comparison in **constant time**
+- In 2026, it remains one of the most underestimated vulnerabilities
 
-## Utilisation
+## Usage
 
 ```bash
-# Démo automatique
+# Automatic demo
 python3 timing-attack.py --demo
 
-# Attaquer un mot de passe spécifique
+# Attack a specific password
 python3 timing-attack.py "mon_mot_de_passe"
 ```
 
-Code de retour : `0` succès (mot de passe retrouvé), `1` échec (caractère hors
-du jeu attaqué), `2` mauvaise utilisation.
+Exit code: `0` success (password recovered), `1` failure (character outside
+the attacked charset), `2` misuse.
 
-Variables d'environnement :
+Environment variables:
 ```bash
-export TIMING_SLEEP=0.01    # délai artificiel par comparaison (défaut 0.01 s)
-export TIMING_CHARSET=abcdefghijklmnopqrstuvwxyz0123456789  # jeu attaqué
+export TIMING_SLEEP=0.01    # artificial delay per comparison (default 0.01 s)
+export TIMING_CHARSET=abcdefghijklmnopqrstuvwxyz0123456789  # attacked charset
 ```
 
-## Parade
+## Countermeasure
 
 ```python
-# ❌ Vulnérable
+# ❌ Vulnerable
 if user_input == secret:
     ...
 
-# ✅ Temps constant
+# ✅ Constant time
 import hmac
 if hmac.compare_digest(user_input, secret):
     ...
 ```
 
-## Licence
+## License
 
 MIT
